@@ -116,6 +116,24 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(got, ["owner/static"])
 
 
+class RenderTests(unittest.TestCase):
+    def test_required_present(self):
+        self.assertEqual(sync.render("x {{ config.a }}", {"a": "1"}), "x 1")
+
+    def test_required_missing_raises(self):
+        with self.assertRaises(KeyError):
+            sync.render("x {{ config.a }}", {})
+
+    def test_optional_present(self):
+        self.assertEqual(sync.render("x {{ config.a? }}", {"a": "1"}), "x 1")
+
+    def test_optional_missing_is_empty(self):
+        self.assertEqual(sync.render("x{{ config.a? }}y", {}), "xy")
+
+    def test_list_value_joined(self):
+        self.assertEqual(sync.render("{{ config.a }}", {"a": ["p", "q"]}), "p, q")
+
+
 class RealRegistryTests(unittest.TestCase):
     """Guard the actual shipped registry + skills: every repo plans cleanly."""
 

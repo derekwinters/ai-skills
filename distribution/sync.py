@@ -33,7 +33,10 @@ import sys
 
 import yaml
 
-PLACEHOLDER = re.compile(r"\{\{\s*config\.([a-zA-Z0-9_]+)\s*\}\}")
+# `{{ config.key }}` is required (missing → error). `{{ config.key? }}` is
+# optional (missing → renders empty), for repo-specific extras like a backend's
+# OpenAPI/migration checks or a token repo's severity table.
+PLACEHOLDER = re.compile(r"\{\{\s*config\.([a-zA-Z0-9_]+)(\?)?\s*\}\}")
 # Files we render placeholders in; anything else is copied byte-for-byte.
 TEXT_SUFFIXES = (".md", ".txt", ".py", ".json", ".yml", ".yaml", ".sh", ".toml")
 MANIFEST_NAME = ".skills-manifest.json"
@@ -60,10 +63,14 @@ def _render_value(value):
 
 
 def render(text, config, *, where=""):
-    """Substitute ``{{ config.KEY }}`` from ``config``; error on a missing key."""
+    """Substitute ``{{ config.KEY }}`` (required) and ``{{ config.KEY? }}``
+    (optional → empty when absent) from ``config``; error on a missing
+    required key."""
     def repl(match):
-        key = match.group(1)
+        key, optional = match.group(1), match.group(2)
         if key not in config:
+            if optional:
+                return ""
             raise KeyError(
                 f"{where}: references config.{key} but the repo has no such config value"
             )
