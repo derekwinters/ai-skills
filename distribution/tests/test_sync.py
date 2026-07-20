@@ -117,6 +117,24 @@ class PlanTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             sync.plan(self.reg, "owner/missingcfg", self.tmp)
 
+    def test_optional_placeholder_renders_when_present(self):
+        self.assertEqual(
+            sync.render("run: {{ config.test_command? }}",
+                        {"test_command": "pytest"}),
+            "run: pytest",
+        )
+
+    def test_optional_placeholder_empty_when_absent(self):
+        # `{{ config.KEY? }}` renders empty rather than raising when absent.
+        self.assertEqual(
+            sync.render("run: {{ config.test_command? }}!", {}),
+            "run: !",
+        )
+
+    def test_required_placeholder_still_raises_when_absent(self):
+        with self.assertRaises(KeyError):
+            sync.render("run: {{ config.test_command }}", {})
+
     def test_list_repos(self):
         self.assertEqual(len(sync.iter_repos(self.reg)), 4)
 

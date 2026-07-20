@@ -70,6 +70,16 @@ bundles:
     agents: []
     workflows: [docs-test.yml]
 
+  # The label-driven issue pipeline: gatekeeper (command parser) → analysis →
+  # dev (nightly serial builder) → dashboard, plus the unified `dev` agent the
+  # nightly builder wraps. The deterministic scripts ship with their own unit
+  # tests; `pipeline-tests.yml` runs them in the consumer repo and
+  # `dashboard.yml` renders the dashboard on a schedule.
+  pipeline:
+    skills: [pipeline-gatekeeper, pipeline-analysis, pipeline-dev, pipeline-dashboard]
+    agents: [dev]
+    workflows: [dashboard.yml, pipeline-tests.yml]
+
 # ---------------------------------------------------------------------------
 # Consumer repos. `config` values are consumed by parametrized skills so we
 # ship one skill body, not N forks. `ci-watch` is static (no placeholders), so
@@ -184,7 +194,7 @@ repos:
       test_globs: core/src/test app/src/test
 
   derekwinters/lucas-doggiehood:
-    bundles: [core]
+    bundles: [core, pipeline]
     config:
       test_command: "dotnet test CoreTests/Doggiehood.Core.Tests"
       verify_command: "dotnet test CoreTests/Doggiehood.Core.Tests"
