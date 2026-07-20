@@ -103,6 +103,15 @@ class PlanTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             sync.plan(self.reg, "owner/badbundle", self.tmp)
 
+    def test_optional_placeholder_renders_empty_when_absent(self):
+        # required {{ config.k }} errors on absence, optional {{ config.k? }}
+        # renders to empty string (and null renders empty too).
+        self.assertEqual(sync.render("a{{ config.x? }}b", {}), "ab")
+        self.assertEqual(sync.render("a{{ config.x? }}b", {"x": None}), "ab")
+        self.assertEqual(sync.render("a{{ config.x? }}b", {"x": "Z"}), "aZb")
+        with self.assertRaises(KeyError):
+            sync.render("a{{ config.x }}b", {})
+
     def test_missing_config_key_raises(self):
         # 'full' renders {{ config.test_command }} but this repo omits it.
         with self.assertRaises(KeyError):

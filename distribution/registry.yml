@@ -63,6 +63,13 @@ bundles:
       - milestone-implementation-orchestrator
     workflows: []
 
+  # Spec-driven repos: the portable requirements validator + the docs-test gate.
+  # Only subscribe repos that keep requirement tables in docs/spec (see below).
+  spec:
+    skills: [validate-specs]
+    agents: []
+    workflows: [docs-test.yml]
+
 # ---------------------------------------------------------------------------
 # Consumer repos. `config` values are consumed by parametrized skills so we
 # ship one skill body, not N forks. `ci-watch` is static (no placeholders), so
@@ -157,20 +164,24 @@ repos:
       test_notes: "No test suite in this repo — `actionlint` (with a YAML-parse fallback) is the gate. Never emit a 'tests passed' result; record an explicit skip if lint can't run."
 
   derekwinters/roadtrip-backend:
-    bundles: [core]
+    bundles: [core, spec]
     config:
       test_command: npm test
       verify_command: npm run validate:specs
       areas: [sys, evt, api, loc, geo, jrnl, game, trip]
       id_prefix: "AREA"
+      spec_dir: docs/spec
+      test_globs: test scripts
 
   derekwinters/roadtrip-android:
-    bundles: [core]
+    bundles: [core, spec]
     config:
       test_command: "./gradlew -p core test"
       verify_command: ./scripts/validate-specs.sh
       areas: [and, andsync, andloc, andmap, andjrnl, andgame]
       id_prefix: "AND"
+      spec_dir: docs/spec
+      test_globs: core/src/test app/src/test
 
   derekwinters/lucas-doggiehood:
     bundles: [core]
