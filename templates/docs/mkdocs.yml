@@ -1,0 +1,46 @@
+# Starter mkdocs config for a repo adopting a docs site. Copy this file to the
+# repo root (as `mkdocs.yml`), copy the `docs/` folder alongside it, then run:
+#   pip install -r docs/requirements.txt && mkdocs serve
+# `mkdocs build --strict` is what the docs-test workflow runs in CI.
+#
+# Replace the placeholders below (REPLACE-ME) with your repo's values.
+site_name: REPLACE-ME Docs
+site_description: Design and engineering docs for REPLACE-ME
+repo_url: https://github.com/REPLACE-ME/REPLACE-ME
+repo_name: REPLACE-ME/REPLACE-ME
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant
+    - navigation.top
+    - content.action.edit
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Spec:
+      - Requirements: spec/requirements.md

@@ -33,9 +33,9 @@ import sys
 
 import yaml
 
-# `{{ config.key }}` is required (missing → error). `{{ config.key? }}` is
-# optional (missing → renders empty), for repo-specific extras like a backend's
-# OpenAPI/migration checks or a token repo's severity table.
+# `{{ config.KEY }}` is required (missing -> error); `{{ config.KEY? }}` is
+# optional (missing or null -> empty string). Optional placeholders let a
+# shared skill body carry per-repo values that only some repos set.
 PLACEHOLDER = re.compile(r"\{\{\s*config\.([a-zA-Z0-9_]+)(\?)?\s*\}\}")
 # Files we render placeholders in; anything else is copied byte-for-byte.
 TEXT_SUFFIXES = (".md", ".txt", ".py", ".json", ".yml", ".yaml", ".sh", ".toml")
@@ -67,8 +67,9 @@ def render(text, config, *, where=""):
     (optional → empty when absent) from ``config``; error on a missing
     required key."""
     def repl(match):
-        key, optional = match.group(1), match.group(2)
-        if key not in config:
+        key = match.group(1)
+        optional = match.group(2) == "?"
+        if key not in config or config[key] is None:
             if optional:
                 return ""
             raise KeyError(
