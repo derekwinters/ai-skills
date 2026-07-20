@@ -13,19 +13,19 @@ is tracked in the rollout epic.
 ```
 skills/          canonical skills (installed into consumer repos)
 agents/          agent templates (the unified dev agent, orchestrators)   [planned]
-workflows/       reusable GH workflow snippets to distribute              [planned]
+workflows/       workflows distributed into consumer repos (skills-update.yml)
 distribution/    repo-config-as-code: registry.yml + sync.py + schema + tests
-  └─ README.md   how install / weekly-update works
+  └─ README.md   how the pull-based update works
 .github/workflows/
-  skills-sync.yml     install/update repos from the registry (opens PRs)
-  skills-update.yml   weekly fan-out across all repos
   skills-tests.yml    CI for the engine + registry
 ```
 
-## How it works
+## How it works (pull model — "Dependabot for skills")
 
 `distribution/registry.yml` declares which repos install which bundles of
-skills, plus each repo's per-repo config. `distribution/sync.py` renders the
-canonical skills (substituting `{{ config.KEY }}` per repo) and the workflows
-open a PR in each consumer repo. One skill body, many repos, no drift. See
+skills, plus each repo's per-repo config. Each consumer repo runs its **own**
+`skills-update.yml` on a schedule: it pulls the latest `ai-skills`, renders its
+skills via `distribution/sync.py` (substituting `{{ config.KEY }}` per repo),
+and opens a PR **in itself** using its own token. `ai-skills` never pushes into
+other repos. One skill body, many repos, no drift. See
 [`distribution/README.md`](distribution/README.md).

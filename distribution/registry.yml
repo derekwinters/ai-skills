@@ -25,7 +25,10 @@ bundles:
   core:
     skills: [ci-watch]
     agents: []
-    workflows: []
+    # The self-update workflow: installed into every repo so it can pull future
+    # skill updates on its own schedule (Dependabot-style). Self-perpetuating —
+    # once present, it re-renders itself with no diff.
+    workflows: [skills-update.yml]
 
 # ---------------------------------------------------------------------------
 # Consumer repos. `config` values are consumed by parametrized skills so we

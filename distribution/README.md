@@ -19,22 +19,33 @@ without hand-copying and without drift.
   (test/verify commands, areas, commit scopes, requirement-ID prefix).
 - **`schema/`** — JSON Schema for `registry.yml` and the per-repo config.
 
-## The two workflows
+## Distribution: pull, not push ("Dependabot for skills")
 
-| Workflow | Trigger | What it does |
-|---|---|---|
-| `.github/workflows/skills-sync.yml` | manual / reusable | Install/update one repo or a list. Renders skills from the registry and **opens a PR** per repo that drifted. This is the "install" path. |
-| `.github/workflows/skills-update.yml` | weekly cron (+ manual) | Runs `skills-sync` across **all** repos — the `gh skill update --all` equivalent. Fan-out is just "merge a change here and wait for Monday." |
-| `.github/workflows/skills-tests.yml` | PR / push | Runs the engine tests + a guard that every repo in `registry.yml` plans cleanly. |
+Each consumer repo runs its **own** scheduled workflow that checks `ai-skills`
+for the latest release, renders the skills it subscribes to, and opens a PR **in
+itself**. Nothing pushes in from a central place; `ai-skills` never touches the
+other repos.
 
-Nothing is force-applied to consumer repos: every change arrives as a PR a
-human reviews and merges.
+| Workflow | Lives in | Trigger | What it does |
+|---|---|---|---|
+| `workflows/skills-update.yml` | installed into **each consumer repo** | weekly cron (+ manual) | Pull latest `ai-skills`, render this repo's skills, open/update a PR **in this repo** using its own `GITHUB_TOKEN`. |
+| `.github/workflows/skills-tests.yml` | `ai-skills` | PR / push | Engine tests + a guard that every repo in `registry.yml` plans cleanly. |
 
-## Setup required (one-time, human)
+`workflows/skills-update.yml` is itself in the `core` bundle, so every repo
+installs its own updater and it self-perpetuates. Nothing is force-applied —
+every change lands as a PR a human reviews and merges.
 
-- A token with `repo` + `workflow` scope on the consumer repos, stored as the
-  **`SKILLS_SYNC_TOKEN`** secret in this repo. The built-in `GITHUB_TOKEN`
-  cannot push to sibling repos. (Tracked in the rollout epic.)
+## Setup required (one-time, human, per consumer repo)
+
+- Enable Settings → Actions → General → **"Allow GitHub Actions to create and
+  approve pull requests"** (so the repo's own token can open its self-PR).
+- If `ai-skills` is **private**, add a read-only **`AI_SKILLS_READ_TOKEN`**
+  secret (scoped to read `ai-skills` only) so the workflow can check it out. If
+  `ai-skills` is public, no token is needed.
+- Bootstrap: add `workflows/skills-update.yml` to the repo once (after that it
+  keeps itself updated). Tracked in the rollout epic.
+
+No cross-repo write token is needed anywhere.
 
 ## Using it
 
