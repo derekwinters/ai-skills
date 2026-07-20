@@ -137,13 +137,57 @@ class RenderTests(unittest.TestCase):
 class RealRegistryTests(unittest.TestCase):
     """Guard the actual shipped registry + skills: every repo plans cleanly."""
 
+    def setUp(self):
+        self.reg = sync.load_registry(os.path.join(DIST, "registry.yml"))
+
     def test_real_registry_plans_for_every_repo(self):
-        reg_path = os.path.join(DIST, "registry.yml")
-        reg = sync.load_registry(reg_path)
-        for repo in sync.iter_repos(reg):
-            files = sync.plan(reg, repo, REPO_ROOT, ref="test")
+        for repo in sync.iter_repos(self.reg):
+            files = sync.plan(self.reg, repo, REPO_ROOT, ref="test")
             self.assertTrue(files, f"{repo} produced no files")
             self.assertIn(".claude/.skills-manifest.json", files)
+
+    def test_triage_bundle_units(self):
+        units = sync.resolve_units(self.reg, "derekwinters/chores-web-backend")
+        for skill in [
+            "github-issue-categorize",
+            "github-issue-find-duplicates",
+            "github-issue-validate-bug",
+            "github-issue-validate-feature",
+            "github-issue-validate-refactor",
+            "github-issue-completeness",
+            "github-issue-label",
+            "github-issue-suggest-milestone",
+            "github-issue-review",
+            "grill-with-docs",
+        ]:
+            self.assertIn(skill, units["skills"])
+        for agent in [
+            "github-issue-triage-orchestrator",
+            "github-issue-implementation-orchestrator",
+            "milestone-implementation-orchestrator",
+        ]:
+            self.assertIn(agent, units["agents"])
+        # Deprecated skill must not ship.
+        self.assertNotIn("github-issue-plan", units["skills"])
+
+    def test_grill_renders_repo_areas(self):
+        # grill-with-docs is the one parametrized triage skill: its Area
+        # Checklist must render this repo's config.areas, leaving no placeholder.
+        files = sync.plan(self.reg, "derekwinters/chores-web-android", REPO_ROOT)
+        grill = files[".claude/skills/grill-with-docs/SKILL.md"]
+        self.assertNotIn("{{ config", grill)
+        self.assertIn("data, network, domain", grill)  # android's areas, comma-joined
+
+    def test_review_uses_ready_to_grill_not_ready_to_plan(self):
+        files = sync.plan(self.reg, "derekwinters/chores-web-backend", REPO_ROOT)
+        review = files[".claude/skills/github-issue-review/SKILL.md"]
+        self.assertIn("ready-to-grill", review)
+        self.assertNotIn("ready-to-plan", review)
+
+    def test_actions_repo_not_subscribed_to_triage(self):
+        units = sync.resolve_units(self.reg, "derekwinters/chores-web-actions")
+        self.assertNotIn("grill-with-docs", units["skills"])
+        self.assertEqual(units["agents"], [])
 
 
 if __name__ == "__main__":

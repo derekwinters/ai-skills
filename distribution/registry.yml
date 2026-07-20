@@ -18,7 +18,6 @@ defaults:
 # Planned bundles (tracked in the rollout epic), not yet populated:
 #   spec:        validate-specs
 #   lifecycle:   commit, implementation-{validate,prepare,test,verify,finalize}
-#   triage:      github-issue-{categorize,find-duplicates,validate-*,completeness,label,suggest-milestone}
 #   pipeline:    pipeline-{gatekeeper,analysis,dev,dashboard} (+ their scripts/tests)
 # ---------------------------------------------------------------------------
 bundles:
@@ -42,6 +41,28 @@ bundles:
       - implementation-verify
       - implementation-finalize
 
+  # Issue triage flow: engine skills (one job each) + review/grill entry points,
+  # driven by three orchestrator agents. Only grill-with-docs is parametrized
+  # (its Area Checklist / Impact Areas render from `{{ config.areas }}`); every
+  # other body is shared verbatim across subscribed repos.
+  triage:
+    skills:
+      - github-issue-categorize
+      - github-issue-find-duplicates
+      - github-issue-validate-bug
+      - github-issue-validate-feature
+      - github-issue-validate-refactor
+      - github-issue-completeness
+      - github-issue-label
+      - github-issue-suggest-milestone
+      - github-issue-review
+      - grill-with-docs
+    agents:
+      - github-issue-triage-orchestrator
+      - github-issue-implementation-orchestrator
+      - milestone-implementation-orchestrator
+    workflows: []
+
 # ---------------------------------------------------------------------------
 # Consumer repos. `config` values are consumed by parametrized skills so we
 # ship one skill body, not N forks. `ci-watch` is static (no placeholders), so
@@ -50,7 +71,7 @@ bundles:
 # ---------------------------------------------------------------------------
 repos:
   derekwinters/chores-web-backend:
-    bundles: [core, lifecycle]
+    bundles: [core, lifecycle, triage]
     config:
       test_command: pytest
       verify_command: pytest
@@ -73,7 +94,7 @@ repos:
              in `alembic/versions/`. A model change with no revision is a defect — flag it.
 
   derekwinters/chores-web-frontend:
-    bundles: [core, lifecycle]
+    bundles: [core, lifecycle, triage]
     config:
       test_command: npm test
       verify_command: npm run build
@@ -85,7 +106,7 @@ repos:
              them). See `src/__tests__/designTokens.test.js`.
 
   derekwinters/chores-web-android:
-    bundles: [core, lifecycle]
+    bundles: [core, lifecycle, triage]
     config:
       test_command: ./gradlew test
       verify_command: ./gradlew assembleDebug
@@ -93,7 +114,7 @@ repos:
       commit_scopes: [ui, data, network, domain, auth, build]
 
   derekwinters/chores-web-docs:
-    bundles: [core, lifecycle]
+    bundles: [core, lifecycle, triage]
     config:
       test_command: mkdocs build --strict
       verify_command: mkdocs build --strict
@@ -102,7 +123,7 @@ repos:
       test_notes: "This repo has no test suite — the strict `mkdocs build` is the gate."
 
   derekwinters/chores-web-design-tokens:
-    bundles: [core, lifecycle]
+    bundles: [core, lifecycle, triage]
     config:
       test_command: npm test
       verify_command: npm test
