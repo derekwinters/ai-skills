@@ -29,6 +29,18 @@ bundles:
     # skill updates on its own schedule (Dependabot-style). Self-perpetuating —
     # once present, it re-renders itself with no diff.
     workflows: [skills-update.yml]
+  # Single-issue TDD lifecycle skills. Shared bodies; per-repo commands + notes
+  # come from each repo's `config` (test_command, verify_command, commit_scopes,
+  # and optional *_notes). Requires config keys: test_command, verify_command,
+  # commit_scopes.
+  lifecycle:
+    skills:
+      - commit
+      - implementation-validate
+      - implementation-prepare
+      - implementation-test
+      - implementation-verify
+      - implementation-finalize
 
 # ---------------------------------------------------------------------------
 # Consumer repos. `config` values are consumed by parametrized skills so we
@@ -38,23 +50,42 @@ bundles:
 # ---------------------------------------------------------------------------
 repos:
   derekwinters/chores-web-backend:
-    bundles: [core]
+    bundles: [core, lifecycle]
     config:
       test_command: pytest
       verify_command: pytest
       areas: [api, db, auth, scheduler, services, build]
       commit_scopes: [api, db, auth, scheduler, services, build]
+      test_notes: "`pytest` runs the async suite via `asyncio_mode = auto` (see `pytest.ini`); no extra markers needed."
+      prepare_notes: |
+        ## Alembic-migration reminder
+        If the change will touch `app/models.py`, add a matching Alembic revision
+        under `alembic/versions/` (`python -m alembic revision --autogenerate -m "..."`,
+        see `MIGRATIONS.md`). A schema change with no migration is incomplete and is
+        flagged at verify.
+      verify_notes: |
+           - **API contract:** regenerate the schema
+             (`python scripts/generate_openapi.py --output <tmp>/openapi.json`) and diff it
+             against the `chores-web-docs` golden snapshot (`docs/api/openapi.json`). On
+             drift, flag it: the golden snapshot must be updated (and `API_VERSION` bumped
+             for breaking changes) — see CLAUDE.md's Breaking Change Ritual.
+           - **Migrations:** if `app/models.py` changed, confirm a matching revision exists
+             in `alembic/versions/`. A model change with no revision is a defect — flag it.
 
   derekwinters/chores-web-frontend:
-    bundles: [core]
+    bundles: [core, lifecycle]
     config:
       test_command: npm test
       verify_command: npm run build
       areas: [ui, api, theming, routing, auth, build]
       commit_scopes: [ui, api, theming, routing, auth, build]
+      verify_notes: |
+           - **Theming:** confirm no hardcoded color values — components must use the CSS
+             custom properties / `@derekwinters/design-tokens` (runtime themes override
+             them). See `src/__tests__/designTokens.test.js`.
 
   derekwinters/chores-web-android:
-    bundles: [core]
+    bundles: [core, lifecycle]
     config:
       test_command: ./gradlew test
       verify_command: ./gradlew assembleDebug
@@ -62,28 +93,47 @@ repos:
       commit_scopes: [ui, data, network, domain, auth, build]
 
   derekwinters/chores-web-docs:
-    bundles: [core]
+    bundles: [core, lifecycle]
     config:
       test_command: mkdocs build --strict
       verify_command: mkdocs build --strict
       areas: [guide, api, blog, nav]
       commit_scopes: [guide, api, blog, nav, agents]
+      test_notes: "This repo has no test suite — the strict `mkdocs build` is the gate."
 
   derekwinters/chores-web-design-tokens:
-    bundles: [core]
+    bundles: [core, lifecycle]
     config:
       test_command: npm test
       verify_command: npm test
       areas: [tokens, themes, build, android, test]
       commit_scopes: [tokens, themes, build, android, test]
+      commit_notes: |
+        ## Token-change severity → commit type
+        Token changes carry an enforced severity → SemVer mapping (the same table in
+        `CLAUDE.md` and `README.md` — reference it, do not fork it):
+
+        | Change | Commit type | SemVer |
+        |---|---|---|
+        | Token removed or renamed | `feat!:` / `BREAKING CHANGE:` footer | MAJOR |
+        | Token added | `feat:` | MINOR |
+        | Token value changed | `fix:` | PATCH |
+
+        The package is `0.x` (`bump-minor-pre-major: true`), so use `feat!:` or a
+        `BREAKING CHANGE:` footer for a removal/rename regardless, so history stays correct.
+      verify_notes: |
+           - **Artifacts:** confirm the change is present in all three build outputs —
+             `dist/web/tokens.css`, `dist/web/tokens.js`, `dist/android/DesignTokens.kt`.
+             If it lands in only one, that is a build-config bug.
 
   derekwinters/chores-web-actions:
-    bundles: [core]
+    bundles: [core, lifecycle]
     config:
       test_command: "actionlint .github/workflows/*.yml"
       verify_command: "actionlint .github/workflows/*.yml"
       areas: [actions, workflows, agents, skills, docs, ci]
       commit_scopes: [actions, workflows, agents, skills, docs, ci]
+      test_notes: "No test suite in this repo — `actionlint` (with a YAML-parse fallback) is the gate. Never emit a 'tests passed' result; record an explicit skip if lint can't run."
 
   derekwinters/roadtrip-backend:
     bundles: [core]
