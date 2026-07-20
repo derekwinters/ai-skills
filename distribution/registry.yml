@@ -1,0 +1,107 @@
+# Repo config as code — the single source of truth for skill distribution.
+#
+# `bundles` are named sets of installable units (skills / agents / workflows).
+# `repos` map each consumer repo to the bundles it installs plus that repo's
+# per-repo `config` values, which parametrized skills read as `{{ config.KEY }}`.
+#
+# Change this file, merge it, and `skills-update.yml` (weekly) or a manual
+# `skills-sync.yml` run will open a PR in each affected repo. Validated in CI by
+# distribution/tests/test_sync.py.
+version: 1
+
+defaults:
+  install_root: .claude            # where skills/agents land in each consumer repo
+  sync_branch: claude/skills-sync  # branch the sync workflow pushes to
+
+# ---------------------------------------------------------------------------
+# Bundles. Start minimal (only the moved `ci-watch`); grow as skills land here.
+# Planned bundles (tracked in the rollout epic), not yet populated:
+#   spec:        validate-specs
+#   lifecycle:   commit, implementation-{validate,prepare,test,verify,finalize}
+#   triage:      github-issue-{categorize,find-duplicates,validate-*,completeness,label,suggest-milestone}
+#   pipeline:    pipeline-{gatekeeper,analysis,dev,dashboard} (+ their scripts/tests)
+# ---------------------------------------------------------------------------
+bundles:
+  core:
+    skills: [ci-watch]
+    agents: []
+    workflows: []
+
+# ---------------------------------------------------------------------------
+# Consumer repos. `config` values are consumed by parametrized skills so we
+# ship one skill body, not N forks. `ci-watch` is static (no placeholders), so
+# these values are inert today — they are seeded now for the lifecycle/commit
+# bundles that will read them next.
+# ---------------------------------------------------------------------------
+repos:
+  derekwinters/chores-web-backend:
+    bundles: [core]
+    config:
+      test_command: pytest
+      verify_command: pytest
+      areas: [api, db, auth, scheduler, services, build]
+      commit_scopes: [api, db, auth, scheduler, services, build]
+
+  derekwinters/chores-web-frontend:
+    bundles: [core]
+    config:
+      test_command: npm test
+      verify_command: npm run build
+      areas: [ui, api, theming, routing, auth, build]
+      commit_scopes: [ui, api, theming, routing, auth, build]
+
+  derekwinters/chores-web-android:
+    bundles: [core]
+    config:
+      test_command: ./gradlew test
+      verify_command: ./gradlew assembleDebug
+      areas: [ui, data, network, domain, auth, build]
+      commit_scopes: [ui, data, network, domain, auth, build]
+
+  derekwinters/chores-web-docs:
+    bundles: [core]
+    config:
+      test_command: mkdocs build --strict
+      verify_command: mkdocs build --strict
+      areas: [guide, api, blog, nav]
+      commit_scopes: [guide, api, blog, nav, agents]
+
+  derekwinters/chores-web-design-tokens:
+    bundles: [core]
+    config:
+      test_command: npm test
+      verify_command: npm test
+      areas: [tokens, themes, build, android, test]
+      commit_scopes: [tokens, themes, build, android, test]
+
+  derekwinters/chores-web-actions:
+    bundles: [core]
+    config:
+      test_command: "actionlint .github/workflows/*.yml"
+      verify_command: "actionlint .github/workflows/*.yml"
+      areas: [actions, workflows, agents, skills, docs, ci]
+      commit_scopes: [actions, workflows, agents, skills, docs, ci]
+
+  derekwinters/roadtrip-backend:
+    bundles: [core]
+    config:
+      test_command: npm test
+      verify_command: npm run validate:specs
+      areas: [sys, evt, api, loc, geo, jrnl, game, trip]
+      id_prefix: "AREA"
+
+  derekwinters/roadtrip-android:
+    bundles: [core]
+    config:
+      test_command: "./gradlew -p core test"
+      verify_command: ./scripts/validate-specs.sh
+      areas: [and, andsync, andloc, andmap, andjrnl, andgame]
+      id_prefix: "AND"
+
+  derekwinters/lucas-doggiehood:
+    bundles: [core]
+    config:
+      test_command: "dotnet test CoreTests/Doggiehood.Core.Tests"
+      verify_command: "dotnet test CoreTests/Doggiehood.Core.Tests"
+      areas: [gameplay, art, audio, ui, story, build, ai]
+      commit_scopes: [gameplay, art, audio, ui, story, build, ai]

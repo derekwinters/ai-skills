@@ -1,0 +1,125 @@
+# skills-sync — install/update the skills declared in distribution/registry.yml
+# into consumer repos, opening one PR per repo when anything changed.
+#
+# This is the "install" workflow (answers proposal §L0). It is reusable
+# (workflow_call) so skills-update.yml can drive the weekly all-repos run, and
+# also dispatchable by hand for a single repo or an ad-hoc ref.
+#
+# Cross-repo writes need a token with `repo` + `workflow` scope on the consumer
+# repos, provided as the secret SKILLS_SYNC_TOKEN (see the rollout epic for the
+# one-time setup task). The built-in GITHUB_TOKEN cannot push to sibling repos.
+#
+# If the `gh skill` extension is adopted later, the "Render skills" step below
+# can be replaced with `gh skill install`/`gh skill update`; registry.yml stays
+# the source of truth either way.
+name: skills-sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: "owner/repo, comma-separated list, or 'all'"
+        default: all
+        type: string
+      ref:
+        description: "ai-skills ref (tag/sha/branch) to sync from"
+        default: main
+        type: string
+  workflow_call:
+    inputs:
+      repos:
+        default: all
+        type: string
+      ref:
+        default: main
+        type: string
+    secrets:
+      SKILLS_SYNC_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - id: list
+        run: |
+          matrix=$(python distribution/sync.py \
+            --registry distribution/registry.yml \
+            --list-repos --json --filter "${{ inputs.repos }}")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "Targets: $matrix"
+
+  sync:
+    needs: discover
+    if: needs.discover.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo: ${{ fromJson(needs.discover.outputs.matrix) }}
+    steps:
+      - name: Checkout ai-skills (source of truth)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          path: ai-skills
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+
+      - name: Checkout consumer repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repo }}
+          path: consumer
+          token: ${{ secrets.SKILLS_SYNC_TOKEN }}
+
+      - name: Render skills into consumer working tree
+        run: |
+          python ai-skills/distribution/sync.py \
+            --registry ai-skills/distribution/registry.yml \
+            --repo "${{ matrix.repo }}" \
+            --source ai-skills \
+            --out consumer \
+            --ref "${{ inputs.ref }}"
+
+      - name: Open PR if anything changed
+        working-directory: consumer
+        env:
+          GH_TOKEN: ${{ secrets.SKILLS_SYNC_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes for ${{ matrix.repo }} — already in sync."
+            exit 0
+          fi
+          branch="claude/skills-sync"
+          base="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
+          git config user.name "skills-sync"
+          git config user.email "skills-sync@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add -A
+          git commit -m "chore(skills): sync AI skills from ai-skills@${{ inputs.ref }}"
+          git push -f -u origin "$branch"
+          if [ -z "$(gh pr list --head "$branch" --state open --json number -q '.[0].number')" ]; then
+            gh pr create \
+              --title "chore(skills): sync AI skills from ai-skills" \
+              --body "Automated sync from \`derekwinters/ai-skills@${{ inputs.ref }}\` via registry.yml. Review the diff and merge. Re-runs update this same branch." \
+              --head "$branch" --base "$base"
+          else
+            echo "PR already open for $branch — updated in place."
+          fi
