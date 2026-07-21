@@ -23,7 +23,9 @@ defaults:
 bundles:
   core:
     skills: [ci-watch]
-    agents: []
+    # The unified spec-first / strict-TDD dev agent is standard for every code
+    # repo (renders stack specifics from optional {{ config.*? }} placeholders).
+    agents: [dev]
     # The self-update workflow: installed into every repo so it can pull future
     # skill updates on its own schedule (Dependabot-style). Self-perpetuating —
     # once present, it re-renders itself with no diff.
