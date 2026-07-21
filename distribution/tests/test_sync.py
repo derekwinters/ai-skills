@@ -214,7 +214,16 @@ class RealRegistryTests(unittest.TestCase):
     def test_actions_repo_not_subscribed_to_triage(self):
         units = sync.resolve_units(self.reg, "derekwinters/chores-web-actions")
         self.assertNotIn("grill-with-docs", units["skills"])
-        self.assertEqual(units["agents"], [])
+        # Gets the universal `dev` agent (core) but not the triage orchestrators.
+        self.assertIn("dev", units["agents"])
+        self.assertNotIn("github-issue-triage-orchestrator", units["agents"])
+
+    def test_dev_agent_universal(self):
+        for repo in sync.iter_repos(sync.load_registry(
+                os.path.join(DIST, "registry.yml"))):
+            units = sync.resolve_units(sync.load_registry(
+                os.path.join(DIST, "registry.yml")), repo)
+            self.assertIn("dev", units["agents"], f"{repo} missing dev agent")
 
 
 if __name__ == "__main__":
